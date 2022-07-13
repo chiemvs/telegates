@@ -101,4 +101,4 @@ def make_anoms(name: str, blocksize = 50, degree: int = 3):
 
 #for name, deg in zip(['olr_tropics','z300_nhnorm'],[4,4]):
 #    make_anoms(name = name, degree = deg, blocksize = 100)
-make_anoms(name = 'sst_nhplus', degree = 4, blocksize = 100)
+#make_anoms(name = 't2m_europe', degree = 5, blocksize = 150)

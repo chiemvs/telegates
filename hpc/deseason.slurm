@@ -1,9 +1,9 @@
 #!/usr/bin/bash
-#SBATCH --job-name="dessst"
+#SBATCH --job-name="dest2m"
 #SBATCH --nodelist=node241
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=10gb
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=30gb
 #SBATCH --time=240:00:00
 #SBATCH --partition=ivm
 #SBATCH --output=/scistor/ivm/jsn295/python_%j.out
