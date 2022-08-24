@@ -71,10 +71,14 @@ datadir = Path(os.path.expanduser('~/ERA5/'))
 anomdir = Path(os.path.expanduser('~/paper4/anomalies'))
 
 def make_anoms(name: str, blocksize = 50, degree: int = 3):
-    da = xr.open_dataarray(datadir / f'{name}.nc')
+    varname = name.split('_')[0]
+    try:
+        da = xr.open_dataarray(datadir / f'{name}.nc')
+    except ValueError:
+        da = xr.open_dataset(datadir / f'{name}.nc')[varname] # Multiple variables in the file
     outpath = anomdir / f'{name}.anom.deg{degree}.nc'
 
-    wr = Writer(datapath = outpath, varname = name.split('_')[0])
+    wr = Writer(datapath = outpath, varname = varname)
     wr.create_dataset(example = da)
 
 
@@ -99,6 +103,7 @@ def make_anoms(name: str, blocksize = 50, degree: int = 3):
     
         wr.write_spatial_block(array = deseasonalized, latslice = latslice, lonslice = lonslice, units = da.units )
 
-#for name, deg in zip(['olr_tropics','z300_nhnorm'],[4,4]):
+#for name, deg in zip(['v300_nhnorm','u300_nhnorm'],[4,4]):
 #    make_anoms(name = name, degree = deg, blocksize = 100)
 #make_anoms(name = 't2m_europe', degree = 5, blocksize = 150)
+make_anoms(name = 'stream_nhnorm', degree = 4, blocksize = 150)

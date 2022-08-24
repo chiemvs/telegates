@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-#SBATCH --job-name="dest2m"
+#SBATCH --job-name="desstream"
 #SBATCH --nodelist=node241
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
