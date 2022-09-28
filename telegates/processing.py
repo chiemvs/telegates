@@ -1,10 +1,10 @@
 import os
 import sys
-import uuid
 import numpy as np
 import pandas as pd
 import xarray as xr
 
+from scipy.signal import detrend
 from pathlib import Path
 
 regions = pd.DataFrame({'latrange':[slice(-1.5,5.5),slice(10.75,15.25),slice(19.5,24.25)],
@@ -12,7 +12,7 @@ regions = pd.DataFrame({'latrange':[slice(-1.5,5.5),slice(10.75,15.25),slice(19.
     index = pd.Index(['warm1','cold1','cold2']), dtype = 'object')
 
 eradir = Path(os.path.expanduser('~/ERA5/'))
-    
+
 def selectregion(array: xr.DataArray, name: str):
     assert (name in regions.index), f'choose one of the region names in {regions.index}'
     return array.sel(latitude = regions.loc[name,'latrange'], longitude = regions.loc[name,'lonrange'])
@@ -69,7 +69,7 @@ def evaluate_poly(array : xr.DataArray, coefs: xr.DataArray, year: int = None):
         y += X**degree * coefs.sel(coefs = degree, drop = True)
     return y
 
-def deseasonalize(array: xr.DataArray, per_year: bool = False, return_polyval: bool = False, degree = 3):
+def deseasonalize(array: xr.DataArray, per_year: bool = False, return_polyval: bool = False, degree = 4, normalslice: slice = slice(None)):
     """
     If per year then trend is removed (and likely also interannual variability)
     plus you'll get a jump on the first of january. (not so important for summer)
@@ -86,14 +86,14 @@ def deseasonalize(array: xr.DataArray, per_year: bool = False, return_polyval: b
             if return_polyval:
                 polyval.loc[polyval.time.dt.year == year,...] = yearly_polyval
     else:
-        polyval = evaluate_poly(array, coefs = fit_poly(array, degree = degree))
+        polyval = evaluate_poly(array, coefs = fit_poly(array.sel(time = normalslice), degree = degree))
         deseasonalized -= polyval
     if return_polyval:
         return deseasonalized, polyval
     else:
         return deseasonalized
 
-def makeindex(deseason = True, remove_interannual = True, timeagg: int = None):
+def makeindex(deseason = True, remove_interannual = True, timeagg: int = None, degree: int = 4):
     """ 
     Whether to deseason on the daily timescale and per gridpoint
     Remove interannual only relevant if deasonalizing
@@ -106,7 +106,7 @@ def makeindex(deseason = True, remove_interannual = True, timeagg: int = None):
         components = {'w':warm,'c1':cold1,'c2':cold2}
     if deseason:
         for key,field in components.items():
-            components[key] = deseasonalize(field,per_year=remove_interannual, return_polyval=False, degree = 4)
+            components[key] = deseasonalize(field,per_year=remove_interannual, return_polyval=False, degree = degree)
     if not (timeagg is None):
         for key,field in components.items():
             components[key] = agg_time(array = field, ndayagg = timeagg)
@@ -120,12 +120,12 @@ def lag_precursor(precursor: pd.Series, separation: int, timeagg: int):
     lagged.index = lagged.index + pd.Timedelta(abs(separation) + timeagg, unit = 'D')
     return lagged
 
-def create_response(respagg = 31):
+def create_response(respagg: int = 31, degree: int = 5):
     subdomainlats = slice(40,56)
     subdomainlons = slice(-5,24)
     t2m = xr.open_dataarray(eradir / 't2m_europe.nc').sel(latitude = subdomainlats, longitude = subdomainlons)
     clusterfield = xr.open_dataarray('/scistor/ivm/jsn295/clusters/t2m-q095.nc').sel(nclusters = 15, latitude = subdomainlats, longitude = subdomainlons)
-    t2manom = deseasonalize(t2m,per_year=False, return_polyval=False, degree = 5)
+    t2manom = deseasonalize(t2m,per_year=False, return_polyval=False, degree = degree)
     spatmean = t2manom.groupby(clusterfield).mean('stacked_latitude_longitude')
     spatmean = spatmean.sel(clustid = 9)
     response = agg_time(spatmean, ndayagg = respagg)
@@ -157,94 +157,3 @@ def combine_index_response(idx, idxname, response: xr.DataArray, lag = True, sep
     if detrend_response:
         combined.loc[:,response.name] = detrend(combined.loc[:,response.name])
     return combined
-    
-def digitize(combined_frame : pd.DataFrame, thresholds: pd.DataFrame):
-    """
-    shapes: frame (n_samples, n_variables), thresholds (nthresholds, n variables)
-    """
-    which_category = combined_frame.copy()
-    for var in combined_frame.columns:
-        which_category[var] = np.digitize(combined_frame[var], thresholds[var])
-    return which_category
-
-def split(digitized_frame: pd.DataFrame, to_split: pd.Series):
-    """
-    Split another series into subsets by means of the digitized combinations
-    Groups of combinations (e.g. exceedence in one combined with exceedence in other)
-    are extracted. Properties of the other series are computed with timestamps of the groups.
-    """
-    match = digitized_frame.index.intersection(to_split.index)
-    if len(match) != len(digitized_frame.index):
-        warnings.warn(f'to split series is {len(to_split.index) - len(digitized_frame.index)} longer than digitized combinations, only {match.min()} till {match.max()} can be used')
-    splitted = digitized_frame.groupby(digitized_frame.columns.to_list()).apply(lambda x: to_split.loc[x.index.intersection(to_split.index)])
-    return splitted
-
-def split_index(digitized_frame: pd.DataFrame, to_split: pd.Series):
-    """
-    Split another series into subsets by means of the digitized combinations
-    Groups of combinations (e.g. exceedence in one combined with exceedence in other)
-    are extracted and for each the appropriate proportion of the to_split index is returned
-    """
-    splitted = split(digitized_frame = digitized_frame, to_split = to_split)
-    timestamps = splitted.groupby(splitted.index.names[:-1]).apply(lambda s: s.index.get_level_values('time'))
-    return timestamps
-
-if __name__ == '__main__':
-    sstindex = makeindex(deseason = True, remove_interannual=False, timeagg = 21)
-    response = create_response(respagg = 31)
-    
-    separation = -15
-    idxname = '21d_deseas_inter'
-    combined = combine_index_response(idx = sstindex, idxname = idxname, response = response,
-                                      lag = True, separation = separation, only_months = [6,7,8], detrend_response = False)
-    
-    timeslices = [slice('2000-01-01','2021-01-01')]
-    
-    compvars = ['sst_nhplus','u300_nhnorm','v300_nhnorm','z300_nhnorm','olr_tropics','stream_nhnorm']
-    #compvars = ['t2m_europe']
-    anom = False
-    anom_20 = True
-    timeagg = False
-    
-    assert not (anom_20 and anom), 'If you choose to deseason on last 20 years you cannot pick the anomalies'
-    
-    outdir = Path('~/paper4/analysis/composites')
-    
-    if anom:
-        basedir = Path('~/paper4/anomalies/')
-        extension = '_anom'
-    elif anom_20:
-        basedir = Path('~/paper4/anomalies20/')
-        extension = '_anom20yr'
-    else:
-        basedir = Path('~/ERA5')
-        extension = ''
-    
-    for compvar in compvars:
-    
-        var = compvar.split('_')[0]
-        randid = uuid.uuid4().hex
-    
-        filepath = basedir / f'{compvar}{".anom.deg4" if (anom or anom_20) else ""}.nc'
-        da = xr.open_dataarray(filepath)
-        timestamps= da.coords['time'].to_pandas()
-    
-        for sl in timeslices:
-            comb = combined.loc[sl,:]
-            thresholds = comb.quantile([0.5])
-            digits = digitize(comb, thresholds=thresholds)
-            ts = timestamps.loc[sl]
-            subsets = split_index(digits, ts)
-            comps = []
-            if timeagg: # Time aggregation with cdo. to 21 days
-                da.close()
-                stdout = os.system(f'cdo --timestat_date first -P 10 runmean,21 -seldate,{sl.start},{(pd.Timestamp(sl.stop)+pd.Timedelta(21,"d")).strftime("%Y-%m-%d")} {str(filepath)} ~/temp_{randid}.nc')
-                da = xr.open_dataarray(f'~/temp_{randid}.nc', drop_variables = 'time_bnds')
-            for ind in subsets:
-                laggedind = ind - pd.Timedelta(abs(separation), unit='D')
-                comps.append(da.sel(time = laggedind).mean('time'))
-            comps = xr.concat(comps,dim = subsets.index).unstack('concat_dim')
-            comps.attrs.update({'nsamples':str(subsets.index.names) + str(subsets.map(lambda a: len(a)).to_dict()), 'units':da.units})
-            outname = f'{sl.start}_{sl.stop}_{compvar}{extension}{"_21d" if timeagg else ""}.nc'
-            comps.to_netcdf(outdir / outname)
-            da.close()
