@@ -16,7 +16,12 @@ sys.path.append(os.path.expanduser('~/Documents/telegates/'))
 
 from telegates.processing import deseasonalize
 
-NAME = sys.argv[1] # Should enter as a string
+TMPDIR = Path(sys.argv[1]) # Should enter as a string
+NAME = sys.argv[2] # Should enter as a string
+
+# Copy the right data to tempdir
+print(f'cp {os.path.expanduser("~/ERA5/")}{NAME}.nc {TMPDIR / NAME}.nc')
+os.system(f'cp {os.path.expanduser("~/ERA5/")}{NAME}.nc {TMPDIR / NAME}.nc')
 
 def make_anoms(name: str, outpath: Path, blocksize = 50, degree: int = 4, normalslice: slice = slice(None)):
     """
@@ -25,9 +30,9 @@ def make_anoms(name: str, outpath: Path, blocksize = 50, degree: int = 4, normal
     """
     varname = name.split('_')[0]
     try:
-        da = xr.open_dataarray(datadir / f'{name}.nc')
+        da = xr.open_dataarray(TMPDIR / f'{name}.nc')
     except ValueError:
-        da = xr.open_dataset(datadir / f'{name}.nc')[varname] # Multiple variables in the file
+        da = xr.open_dataset(TMPDIR / f'{name}.nc')[varname] # Multiple variables in the file
 
     wr = Writer(datapath = outpath, varname = varname)
     wr.create_dataset(example = da)
@@ -55,10 +60,11 @@ def make_anoms(name: str, outpath: Path, blocksize = 50, degree: int = 4, normal
         wr.write_spatial_block(array = deseasonalized, latslice = latslice, lonslice = lonslice, units = da.units )
     wr.write_attrs(attrs = {'degree':degree})
 
-datadir = Path(os.path.expanduser('~/ERA5/'))
 anomdir = Path(os.path.expanduser('~/paper4/anomalies'))
-for normalslice, subdir  in zip([slice('2000-01-01','2021-01-01'), slice(None)], ['last20','full']):
+for normalslice, subdir  in zip([slice(None)],['full']): #zip([slice('2000-01-01','2021-01-01'), slice(None)], ['last20','full']):
     for degree in [5,7]:
+        tmpoutpath = TMPDIR / f'{NAME}.anom.deg{degree}.{subdir}.nc'
         outpath = anomdir / subdir / f'{NAME}.anom.deg{degree}.nc'
-        print(outpath)
-        make_anoms(name = NAME, outpath = outpath, degree = degree, blocksize = 100, normalslice = normalslice)
+        make_anoms(name = NAME, outpath = tmpoutpath, degree = degree, blocksize = 120, normalslice = normalslice)
+        print(f'mv {tmpoutpath} {outpath}')
+        os.system(f'mv {tmpoutpath} {outpath}')

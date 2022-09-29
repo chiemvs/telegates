@@ -140,11 +140,9 @@ def combine_index_response(idx, idxname, response: xr.DataArray, lag = True, sep
         ids.name = idx.name
     else:
         ids = idx
-    if idxname.startswith('21'):
-        precursoragg = 21
-    else:
-        precursoragg = 1
+    precursoragg = int(idxname.split('_')[0][:-1])
     if lag:
+        print(f'lagging, agg: {precursoragg}, sep: {separation}')
         lagged = lag_precursor(ids, separation = separation, timeagg = precursoragg)
         lagged.name = ids.name
     else:
