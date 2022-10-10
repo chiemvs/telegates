@@ -11,11 +11,15 @@ regions = pd.DataFrame({'latrange':[slice(-1.5,5.5),slice(10.75,15.25),slice(19.
     'lonrange':[slice(162,169),slice(147,151.75),slice(155,161)]},
     index = pd.Index(['warm1','cold1','cold2']), dtype = 'object')
 
+regions2 = pd.DataFrame({'latrange':[slice(-1.5,5.5),slice(10,14)],
+    'lonrange':[slice(162,169),slice(139.5,150.5)]},
+    index = pd.Index(['warm1','cold1']), dtype = 'object')
+
 eradir = Path(os.path.expanduser('~/ERA5/'))
 
-def selectregion(array: xr.DataArray, name: str):
-    assert (name in regions.index), f'choose one of the region names in {regions.index}'
-    return array.sel(latitude = regions.loc[name,'latrange'], longitude = regions.loc[name,'lonrange'])
+def selectregion(array: xr.DataArray, name: str, select_from: pd.DataFrame = regions):
+    assert (name in select_from.index), f'choose one of the region names in {select_from.index}'
+    return array.sel(latitude = select_from.loc[name,'latrange'], longitude = select_from.loc[name,'lonrange'])
 
 def spatial_mean(array: xr.DataArray):
     stacked = array.stack({'latlon':['latitude','longitude']})
@@ -92,6 +96,26 @@ def deseasonalize(array: xr.DataArray, per_year: bool = False, return_polyval: b
         return deseasonalized, polyval
     else:
         return deseasonalized
+
+def makeindex2(deseason = True, remove_interannual = True, timeagg: int = None, degree: int = 4):
+    """ 
+    Whether to deseason on the daily timescale and per gridpoint
+    Remove interannual only relevant if deasonalizing
+    Aggregation by time possible before constructing the index (left stamping)
+    """
+    with xr.open_dataarray(eradir / 'sst_nhplus.nc') as da:
+        warm = selectregion(da,'warm1', select_from = regions2)
+        cold1 = selectregion(da,'cold1', select_from = regions2)
+        components = {'w':warm,'c1':cold1}
+    if deseason:
+        for key,field in components.items():
+            components[key] = deseasonalize(field,per_year=remove_interannual, return_polyval=False, degree = degree)
+    if not (timeagg is None):
+        for key,field in components.items():
+            components[key] = agg_time(array = field, ndayagg = timeagg)
+    #index = spatial_mean(components['w']) - np.stack([spatial_mean(components['c1']),spatial_mean(components['c2'])]).min(axis = 0)
+    index = spatial_mean(components['w']) - spatial_mean(components['c1'])
+    return index
 
 def makeindex(deseason = True, remove_interannual = True, timeagg: int = None, degree: int = 4):
     """ 
