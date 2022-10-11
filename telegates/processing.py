@@ -138,10 +138,17 @@ def makeindex(deseason = True, remove_interannual = True, timeagg: int = None, d
     index = spatial_mean(components['w']) - np.stack([spatial_mean(components['c1']),spatial_mean(components['c2'])]).mean(axis = 0)
     return index
             
-def lag_precursor(precursor: pd.Series, separation: int, timeagg: int):
-    """timeagg = timeagg of the precursor"""
+def lag_precursor(precursor: pd.Series, separation: int, timeagg: int, sign: bool = False):
+    """
+    timeagg = timeagg of the precursor
+    Can be made sign-sensitive, for both forward and backward lagging. 
+    With forward lagging timeagg should be timeagg of response.
+    """
     lagged = precursor.copy()
-    lagged.index = lagged.index + pd.Timedelta(abs(separation) + timeagg, unit = 'D')
+    if sign and (separation > 0):
+        lagged.index = lagged.index - pd.Timedelta(separation + timeagg, unit = 'D') 
+    else:
+        lagged.index = lagged.index + pd.Timedelta(abs(separation) + timeagg, unit = 'D')
     return lagged
 
 def create_response(respagg: int = 31, degree: int = 5):
