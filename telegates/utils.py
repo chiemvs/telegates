@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from typing import Union
+from typing import Union, List
 
 from scipy.interpolate import interp1d
 
@@ -22,3 +22,8 @@ def interpolate(inp: Union[pd.DataFrame, pd.Series], kind: str = 'linear'):
         return interpolated.iloc[:,-1] # Returning as series again
     else:
         return interpolated
+
+
+def select_months(df: Union[pd.DataFrame, pd.Series], months: List[int]):
+    assert isinstance(df.index, pd.DatetimeIndex), 'pandas object needs to be datetime indexed, for selecting months'
+    return df.loc[df.index.month.map(lambda m: m in months)]

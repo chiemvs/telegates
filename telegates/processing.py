@@ -7,6 +7,8 @@ import xarray as xr
 from scipy.signal import detrend
 from pathlib import Path
 
+from .utils import select_months
+
 regions = pd.DataFrame({'latrange':[slice(-1.5,5.5),slice(10.75,15.25),slice(19.5,24.25)],
     'lonrange':[slice(162,169),slice(147,151.75),slice(155,161)]},
     index = pd.Index(['warm1','cold1','cold2']), dtype = 'object')
@@ -182,7 +184,7 @@ def combine_index_response(idx, idxname, response: xr.DataArray, lag = True, sep
     response_pd.name = response.name
     combined = pd.merge(lagged, response_pd, left_index = True, right_index = True, how = 'inner')
     if not (only_months is None):
-        combined = combined.loc[combined.index.month.map(lambda m: m in only_months),:]
+        combined = select_months(df = combined, months = only_months)
     if detrend_response:
         combined.loc[:,response.name] = detrend(combined.loc[:,response.name])
     return combined
