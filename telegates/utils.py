@@ -27,3 +27,12 @@ def interpolate(inp: Union[pd.DataFrame, pd.Series], kind: str = 'linear'):
 def select_months(df: Union[pd.DataFrame, pd.Series], months: List[int]):
     assert isinstance(df.index, pd.DatetimeIndex), 'pandas object needs to be datetime indexed, for selecting months'
     return df.loc[df.index.month.map(lambda m: m in months)]
+
+def data_for_pcolormesh(array, shading:str):
+    """Xarray array to usuable things"""
+    lats = array.latitude.values # Interpreted as northwest corners (90 is in there)
+    lons = array.longitude.values # Interpreted as northwest corners (-180 is in there, 180 not)
+    if shading == 'flat':
+        lats = np.concatenate([lats[[0]] - np.diff(lats)[0], lats], axis = 0) # Adding the sourthern edge 
+        lons = np.concatenate([lons, lons[[-1]] + np.diff(lons)[0]], axis = 0)# Adding the eastern edge (only for flat shating)
+    return lons, lats, array.values.squeeze()

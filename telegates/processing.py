@@ -144,11 +144,11 @@ def lag_precursor(precursor: pd.Series, separation: int, timeagg: int, sign: boo
     """
     timeagg = timeagg of the precursor
     Can be made sign-sensitive, for both forward and backward lagging. 
-    With forward lagging timeagg should be timeagg of response.
+    With forward lagging the separation is relative to the beginning of response.
     """
     lagged = precursor.copy()
     if sign and (separation > 0):
-        lagged.index = lagged.index - pd.Timedelta(separation + timeagg, unit = 'D') 
+        lagged.index = lagged.index - pd.Timedelta(separation, unit = 'D') 
     else:
         lagged.index = lagged.index + pd.Timedelta(abs(separation) + timeagg, unit = 'D')
     return lagged

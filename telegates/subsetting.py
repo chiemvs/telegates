@@ -49,9 +49,12 @@ def split_compute(digitized_frame: pd.DataFrame, to_split: pd.Series):
     are extracted. Properties of the other series are computed with timestamps of the groups.
     """
     splitted = split(digitized_frame = digitized_frame, to_split = to_split)
-    means = splitted.groupby(splitted.index.names[:-1]).mean()
-    stds = splitted.groupby(splitted.index.names[:-1]).std()
-    return means.unstack(1), stds.unstack(1)
+    grouped = splitted.groupby(splitted.index.names[:-1])
+    means = grouped.mean()
+    stds = grouped.std()
+    mins = grouped.min()
+    maxs = grouped.max()
+    return means.unstack(1), stds.unstack(1), mins.unstack(1), maxs.unstack(1)
 
 def split_index(digitized_frame: pd.DataFrame, to_split: pd.Series):
     """
