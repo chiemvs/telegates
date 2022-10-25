@@ -21,7 +21,13 @@ eradir = Path(os.path.expanduser('~/ERA5/'))
 
 def selectregion(array: xr.DataArray, name: str, select_from: pd.DataFrame = regions):
     assert (name in select_from.index), f'choose one of the region names in {select_from.index}'
-    return array.sel(latitude = select_from.loc[name,'latrange'], longitude = select_from.loc[name,'lonrange'])
+    if select_from.loc[name,'lonrange'].stop < select_from.loc[name,'lonrange'].start: # Crossing the dateline
+        interval = float(np.unique(np.diff(array.longitude)))
+        lonrange = np.concatenate([np.arange(select_from.loc[name,'lonrange'].start,180,interval),
+            np.arange(-180,select_from.loc[name,'lonrange'].stop,interval)])
+    else:
+        lonrange = select_from.loc[name,'lonrange']
+    return array.sel(latitude = select_from.loc[name,'latrange'], longitude = lonrange)
 
 def spatial_mean(array: xr.DataArray):
     stacked = array.stack({'latlon':['latitude','longitude']})
