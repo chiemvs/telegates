@@ -25,16 +25,17 @@ outdir = analysisdir / 'composites'
 if __name__ == '__main__':
     respagg = 31
     separation = -15
-    idxagg = 21
+    wpdagg = 21
+    predagg = 21
     degree = 7
-    fullname = f't2m_{respagg}_sst_{idxagg}_sep_{separation}_deg_{degree}.h5' 
+    fullname = f't2m_{respagg}_sst_{wpdagg}_sep_{separation}_deg_{degree}.h5' 
     fullpath = analysisdir / fullname
     if not fullpath.exists():
         print('creating combined dataframe')
         sstindex = makeindex2(deseason = True, remove_interannual=False, timeagg = 21, degree = degree)
         response = create_response(respagg = respagg, degree = degree)
     
-        combined = combine_index_response(idx = sstindex, idxname = f'{idxagg}d_sst', response = response,
+        combined = combine_index_response(idx = sstindex, idxname = f'{wpdagg}d_sst', response = response,
                                       lag = True, separation = separation, only_months = [6,7,8], detrend_response = False)
         combined.to_hdf(fullpath, key = 'combined')
     else:
@@ -43,7 +44,8 @@ if __name__ == '__main__':
     
     quantiles = [0.33,0.66]
     overall_thresholds = combined.quantile(quantiles)
-    timeslices = [slice('1968-01-01','1983-01-01'),slice('2000-01-01','2021-08-31')]
+    #timeslices = [slice('1968-01-01','1983-01-01'),slice('2000-01-01','2021-08-31')]
+    timeslices = [slice('2000-01-01','2020-09-01')]
     
     if ANOM == 'False':
         datadir = Path(os.path.expanduser('~/ERA5'))
@@ -72,12 +74,12 @@ if __name__ == '__main__':
         if AGGTIME: # Time aggregation with cdo. to 21 days
             randfile = uuid.uuid4().hex + '.nc'
             da.close()
-            print(f'cdo --timestat_date first -P 10 runmean,{idxagg} -seldate,{(pd.Timestamp(sl.start)-pd.Timedelta(idxagg + abs(separation),"d")).strftime("%Y-%m-%d")},{(pd.Timestamp(sl.stop)+pd.Timedelta(idxagg,"d")).strftime("%Y-%m-%d")} {str(TMPDIR / dataname)} {str(TMPDIR / randfile)}')
-            os.system(f'cdo --timestat_date first -P 10 runmean,{idxagg} -seldate,{(pd.Timestamp(sl.start)-pd.Timedelta(idxagg + abs(separation),"d")).strftime("%Y-%m-%d")},{(pd.Timestamp(sl.stop)+pd.Timedelta(idxagg,"d")).strftime("%Y-%m-%d")} {str(TMPDIR / dataname)} {str(TMPDIR / randfile)}')
+            print(f'cdo --timestat_date first -P 10 runmean,{predagg} -seldate,{(pd.Timestamp(sl.start)-pd.Timedelta(predagg + abs(separation),"d")).strftime("%Y-%m-%d")},{(pd.Timestamp(sl.stop)+pd.Timedelta(predagg,"d")).strftime("%Y-%m-%d")} {str(TMPDIR / dataname)} {str(TMPDIR / randfile)}')
+            os.system(f'cdo --timestat_date first -P 10 runmean,{predagg} -seldate,{(pd.Timestamp(sl.start)-pd.Timedelta(predagg + abs(separation),"d")).strftime("%Y-%m-%d")},{(pd.Timestamp(sl.stop)+pd.Timedelta(predagg,"d")).strftime("%Y-%m-%d")} {str(TMPDIR / dataname)} {str(TMPDIR / randfile)}')
             da = xr.open_dataarray(TMPDIR / randfile, drop_variables = 'time_bnds')
         for ind in subsets:
             subcomps = []
-            preinit = ind - pd.Timedelta(abs(separation) + idxagg, unit='D')
+            preinit = ind - pd.Timedelta(abs(separation) + predagg, unit='D')
             subcomps.append(da.sel(time = preinit).mean('time').expand_dims({'moment':['preinit']}))
             postinit = ind - pd.Timedelta(abs(separation), unit='D')
             subcomps.append(da.sel(time = postinit).mean('time').expand_dims({'moment':['postinit']}))
@@ -85,7 +87,7 @@ if __name__ == '__main__':
             comps.append(xr.concat(subcomps, dim = 'moment'))
         comps = xr.concat(comps,dim = subsets.index).unstack('concat_dim')
         comps.attrs.update({'nsamples':str(subsets.index.names) + str(subsets.map(lambda a: len(a)).to_dict()), 'units':da.units})
-        outname = f'{sl.start}_{sl.stop}_{COMPVAR}_anom{ANOM}{"_" + str(idxagg) if AGGTIME else ""}.nc'
+        outname = f'{sl.start}_{sl.stop}_{COMPVAR}_anom{ANOM}{"_" + str(predagg) if AGGTIME else ""}.nc'
         print('writing: ', outname)
         comps.to_netcdf(outdir / outname, mode = 'w')
         da.close()
