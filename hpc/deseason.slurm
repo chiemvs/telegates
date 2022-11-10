@@ -1,12 +1,12 @@
 #!/usr/bin/bash
-#SBATCH --job-name="destrl20"
-#SBATCH --nodelist=node242
+#SBATCH --job-name="de40v"
+#SBATCH --nodelist=node002
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=10
+#SBATCH --cpus-per-task=20
 #SBATCH --mem=50gb
 #SBATCH --time=240:00:00
-#SBATCH --partition=ivm
+#SBATCH --partition=defq
 #SBATCH --output=/scistor/ivm/jsn295/python_%j.out
 #SBATCH --error=/scistor/ivm/jsn295/python_%j.err
 
-./run.sh $HOME/VENV ./deseason.py stream_nhnorm
+./run.sh $HOME/VENV ./deseason.py v300_nhnorm

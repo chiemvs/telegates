@@ -1,6 +1,6 @@
 #!/usr/bin/bash
-#SBATCH --job-name="olrcomp"
-#SBATCH --nodelist=node240
+#SBATCH --job-name="compU"
+#SBATCH --nodelist=node242
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=50gb
@@ -11,4 +11,4 @@
 
 module load cdo
 
-./run.sh $HOME/VENV ./composites.py olr_tropics last20 True # This is compvar, anom, aggtime
+./run.sh $HOME/VENV ./composites.py u300_nhnorm last40 True True # This is compvar, anom, aggtime, rollthresh

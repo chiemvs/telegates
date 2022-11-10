@@ -14,6 +14,39 @@ def digitize(combined_frame : pd.DataFrame, thresholds: pd.DataFrame):
         which_category[var] = np.digitize(combined_frame[var], thresholds[var])
     return which_category
 
+def digitize_rolling(combined_frame : pd.DataFrame, quantiles : list = [0.33,0.66], nyearslice: int = 21, overall_thresholds: pd.DataFrame = None, record_counts: bool = False):
+    """
+    No fixed thresholds for t2m-mean-anom, overall thresholds can be presupplied
+    """
+    centeryears = combined_frame.index.year.unique().sort_values()[(nyearslice//2):-(nyearslice//2)]
+    print(centeryears)
+    which_category = combined_frame.copy().astype(int)
+    if overall_thresholds is None:
+        overall_thresholds = combined_frame.quantile(quantiles)
+    if record_counts:
+        overall = count_combinations(digitized_array=digitize(combined_frame, thresholds=overall_thresholds))
+        hidden_counts = pd.DataFrame(np.nan, index = centeryears, columns = overall.stack(0).index)
+
+    for i, centeryear in enumerate(centeryears):
+        roll_sl = slice(pd.Timestamp(f'{centeryear - nyearslice//2}-01-01'),pd.Timestamp(f'{centeryear + nyearslice//2}-12-31'))
+        roll_comb = combined_frame.loc[roll_sl,:] # combined contains only summer values.
+        thresholds = overall_thresholds.copy()
+        thresholds.loc[:,'t2m-mean-anom'] = roll_comb.quantile(quantiles).loc[:,'t2m-mean-anom'] # replacing only the t2m threshold
+        roll_categories = digitize(roll_comb, thresholds=thresholds)
+        if i == 0: # Filling from zeroth enry onwards
+            which_category.loc[slice(None,roll_categories.index.max()),:] = roll_categories
+        else: # Otherwise from central year until the end
+            which_category.loc[slice(f'{centeryear}-01-01',roll_categories.index.max()),:] = roll_categories.loc[slice(f'{centeryear}-01-01',None),:] # replacing centeryear and beyond
+        if record_counts:
+            count = count_combinations(digitized_array=roll_categories)
+            hidden_counts.loc[centeryear,:] = count.stack(0)
+
+    if record_counts:
+        return which_category, hidden_counts
+    else:
+        return which_category
+
+
 def count_combinations(digitized_array, normalize: bool = False):
     """
     Digitized array has e.g. 0,1,2 values for three terciles.

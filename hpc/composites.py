@@ -10,13 +10,14 @@ from pathlib import Path
 sys.path.append(os.path.expanduser('~/Documents/telegates/'))
 
 from telegates.processing import deseasonalize, makeindex, makeindex2, create_response, combine_index_response
-from telegates.subsetting import digitize, split, split_index
+from telegates.subsetting import digitize, digitize_rolling, split, split_index
 
 TMPDIR = Path(sys.argv[1]) # Should enter as a string
 COMPVAR = sys.argv[2] # Should enter as a string, one of ['sst_nhplus','u300_nhnorm','v300_nhnorm','z300_nhnorm','olr_tropics','stream_nhnorm']
 ANOM = sys.argv[3] # Whether to composite anomalies (and what type)
-assert ANOM in ['full','last20','False'], 'anom should be full, last20 or False'
+assert ANOM in ['full','last20','last40','False'], 'anom should be full, last20, last40 or False'
 AGGTIME = sys.argv[4].lower() == 'true' # Whether to aggregate daily values before compositing
+ROLLTHRESH = sys.argv[5].lower() == 'true' # Whether the t2m terciles are computed with a rolling threshold (useful for long timeslices)
 
 basepath = Path(os.path.expanduser('~/paper4/'))
 analysisdir = basepath / 'analysis' / 'dipole' # Whether the dipole or tripole index is used
@@ -42,10 +43,10 @@ if __name__ == '__main__':
         print('combined dataframe directly loaded')
         combined = pd.read_hdf(fullpath)
     
-    quantiles = [0.33,0.66]
+    quantiles = [0.3333,0.6666]
     overall_thresholds = combined.quantile(quantiles)
     #timeslices = [slice('1968-01-01','1983-01-01'),slice('2000-01-01','2021-08-31')]
-    timeslices = [slice('2000-01-01','2020-09-01')]
+    timeslices = [slice('1980-01-01','2021-10-01')]
     
     if ANOM == 'False':
         datadir = Path(os.path.expanduser('~/ERA5'))
@@ -65,9 +66,13 @@ if __name__ == '__main__':
     
     for sl in timeslices:
         comb = combined.loc[sl,:]
-        thresholds = overall_thresholds.copy() # Varying the t2m threshold, but not the west pacific threshold
-        thresholds.loc[:,'t2m-mean-anom'] = comb.quantile(quantiles).loc[:,'t2m-mean-anom'] # replacing only the t2m threshold, for the global warming effect
-        digits = digitize(comb, thresholds=thresholds)
+        if ROLLTHRESH: # Rolling thresholds for t2m
+            digits = digitize_rolling(comb, quantiles = quantiles, nyearslice=21,
+                    overall_thresholds = overall_thresholds, record_counts = False)
+        else:
+            thresholds = overall_thresholds.copy() # Varying the t2m threshold, but not the west pacific threshold
+            thresholds.loc[:,'t2m-mean-anom'] = comb.quantile(quantiles).loc[:,'t2m-mean-anom'] # replacing only the t2m threshold, for the global warming effect
+            digits = digitize(comb, thresholds=thresholds)
         ts = timestamps.loc[sl]
         subsets = split_index(digits, ts)
         comps = []
@@ -87,7 +92,7 @@ if __name__ == '__main__':
             comps.append(xr.concat(subcomps, dim = 'moment'))
         comps = xr.concat(comps,dim = subsets.index).unstack('concat_dim')
         comps.attrs.update({'nsamples':str(subsets.index.names) + str(subsets.map(lambda a: len(a)).to_dict()), 'units':da.units})
-        outname = f'{sl.start}_{sl.stop}_{COMPVAR}_anom{ANOM}{"_" + str(predagg) if AGGTIME else ""}.nc'
+        outname = f'{sl.start}_{sl.stop}_{COMPVAR}_anom{ANOM}{"_" + str(predagg) if AGGTIME else ""}{"_rollthresh" if ROLLTHRESH else ""}.nc'
         print('writing: ', outname)
         comps.to_netcdf(outdir / outname, mode = 'w')
         da.close()

@@ -62,7 +62,8 @@ def make_anoms(name: str, outpath: Path, blocksize = 50, degree: int = 4, normal
 
 anomdir = Path(os.path.expanduser('~/paper4/anomalies'))
 #for normalslice, subdir in zip([slice(None)],['full']): 
-for normalslice, subdir in zip([slice('2000-01-01','2021-01-01')], ['last20']):
+#for normalslice, subdir in zip([slice('2000-01-01','2021-01-01')], ['last20']):
+for normalslice, subdir in zip([slice('1980-01-01','2021-01-01')], ['last40']):
 #for normalslice, subdir in zip([slice('2000-01-01','2021-01-01'), slice(None)], ['last20','full']):
     for degree in [7]:
     #for degree in [5,7]:
