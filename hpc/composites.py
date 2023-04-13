@@ -21,19 +21,19 @@ ROLLTHRESH = sys.argv[5].lower() == 'true' # Whether the t2m terciles are comput
 
 basepath = Path(os.path.expanduser('~/paper4/'))
 analysisdir = basepath / 'analysis' / 'dipole' # Whether the dipole or tripole index is used
-outdir = analysisdir / 'composites'
     
 if __name__ == '__main__':
-    respagg = 31
+    respagg = 28
     separation = -15
-    wpdagg = 21
-    predagg = 21
+    wpdagg = 28
+    predagg = 28
     degree = 7
+    outdir = analysisdir / f'composites_t2m_{respagg}_sst_{wpdagg}_sep_{separation}_deg_{degree}'
     fullname = f't2m_{respagg}_sst_{wpdagg}_sep_{separation}_deg_{degree}.h5' 
     fullpath = analysisdir / fullname
     if not fullpath.exists():
         print('creating combined dataframe')
-        sstindex = makeindex2(deseason = True, remove_interannual=False, timeagg = 21, degree = degree)
+        sstindex = makeindex2(deseason = True, remove_interannual=False, timeagg = wpdagg, degree = degree)
         response = create_response(respagg = respagg, degree = degree)
     
         combined = combine_index_response(idx = sstindex, idxname = f'{wpdagg}d_sst', response = response,

@@ -159,7 +159,7 @@ def lag_precursor(precursor: pd.Series, separation: int, timeagg: int, sign: boo
         lagged.index = lagged.index + pd.Timedelta(abs(separation) + timeagg, unit = 'D')
     return lagged
 
-def create_response(respagg: int = 31, degree: int = 5):
+def _prepare_response(degree: int = 7):
     subdomainlats = slice(40,56)
     subdomainlons = slice(-5,24)
     t2m = xr.open_dataarray(eradir / 't2m_europe.nc').sel(latitude = subdomainlats, longitude = subdomainlons)
@@ -167,6 +167,10 @@ def create_response(respagg: int = 31, degree: int = 5):
     t2manom = deseasonalize(t2m,per_year=False, return_polyval=False, degree = degree)
     spatmean = t2manom.groupby(clusterfield).mean('stacked_latitude_longitude')
     spatmean = spatmean.sel(clustid = 9)
+    return spatmean
+
+def create_response(respagg: int = 31, degree: int = 7):
+    spatmean = _prepare_response(degree = degree)
     response = agg_time(spatmean, ndayagg = respagg)
     return response
 

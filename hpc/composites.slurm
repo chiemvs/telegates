@@ -1,6 +1,6 @@
 #!/usr/bin/bash
-#SBATCH --job-name="compU"
-#SBATCH --nodelist=node242
+#SBATCH --job-name="compu3"
+#SBATCH --nodelist=node241
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=50gb
