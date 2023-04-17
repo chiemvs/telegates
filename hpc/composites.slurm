@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-#SBATCH --job-name="compu3"
+#SBATCH --job-name="compmidlat"
 #SBATCH --nodelist=node241
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=10
@@ -11,4 +11,4 @@
 
 module load cdo
 
-./run.sh $HOME/VENV ./composites.py u300_nhnorm last40 True True # This is compvar, anom, aggtime, rollthresh
+./run.sh $HOME/VENV ./composites.py t2m_midlats last40 True True # This is compvar, anom, aggtime, rollthresh
