@@ -18,6 +18,7 @@ ANOM = sys.argv[3] # Whether to composite anomalies (and what type)
 assert ANOM in ['full','last20','last40','False'], 'anom should be full, last20, last40 or False'
 AGGTIME = sys.argv[4].lower() == 'true' # Whether to aggregate daily values before compositing
 ROLLTHRESH = sys.argv[5].lower() == 'true' # Whether the t2m terciles are computed with a rolling threshold (useful for long timeslices)
+BOOTSTRAP = sys.argv[6].lower() == 'true' # Whether to block bootstrap samples
 
 basepath = Path(os.path.expanduser('~/paper4/'))
 analysisdir = basepath / 'analysis' / 'dipole' # Whether the dipole or tripole index is used
@@ -82,17 +83,31 @@ if __name__ == '__main__':
             print(f'cdo --timestat_date first -P 10 runmean,{predagg} -seldate,{(pd.Timestamp(sl.start)-pd.Timedelta(predagg + abs(separation),"d")).strftime("%Y-%m-%d")},{(pd.Timestamp(sl.stop)+pd.Timedelta(predagg,"d")).strftime("%Y-%m-%d")} {str(TMPDIR / dataname)} {str(TMPDIR / randfile)}')
             os.system(f'cdo --timestat_date first -P 10 runmean,{predagg} -seldate,{(pd.Timestamp(sl.start)-pd.Timedelta(predagg + abs(separation),"d")).strftime("%Y-%m-%d")},{(pd.Timestamp(sl.stop)+pd.Timedelta(predagg,"d")).strftime("%Y-%m-%d")} {str(TMPDIR / dataname)} {str(TMPDIR / randfile)}')
             da = xr.open_dataarray(TMPDIR / randfile, drop_variables = 'time_bnds')
-        for ind in subsets:
+        for ind in subsets: # Subsets are the categorized indices (9 times)
+            moments = {'preinit': ind - pd.Timedelta(abs(separation) + predagg, unit='D'),
+                    'postinit':ind - pd.Timedelta(abs(separation), unit='D'),
+                    'valid':ind}
             subcomps = []
-            preinit = ind - pd.Timedelta(abs(separation) + predagg, unit='D')
-            subcomps.append(da.sel(time = preinit).mean('time').expand_dims({'moment':['preinit']}))
-            postinit = ind - pd.Timedelta(abs(separation), unit='D')
-            subcomps.append(da.sel(time = postinit).mean('time').expand_dims({'moment':['postinit']}))
-            subcomps.append(da.sel(time = ind).mean('time').expand_dims({'moment':['valid']}))
-            comps.append(xr.concat(subcomps, dim = 'moment'))
+            if not BOOTSTRAP: # Insert block bootstrapping here?
+                for moment, moment_index in moments.items():
+                    subcomps.append(da.sel(time = moment_index).mean('time').expand_dims({'moment':[moment]}))
+                ind_fields = xr.concat(subcomps, dim = 'moment')
+            else: # Block bootstrapping from entire population mean of same length. same sample regardless of moment
+                present_years = digits.index.year.unique()
+                for i in range(500):
+                    years_drawn = present_years[np.random.randint(0,len(present_years),len(present_years))]
+                    sample_stamps = pd.DatetimeIndex([])
+                    j = 0
+                    while len(sample_stamps) < len(ind): # No fixed length of ind therefore adaptive sampling
+                        sample_stamps = sample_stamps.append(digits.index[digits.index.year == years_drawn[j]])
+                        j += 1
+
+                    subcomps.append(da.sel(time = sample_stamps).mean('time').expand_dims({'draw':[i]}))
+                ind_fields = xr.concat(subcomps, dim = 'draw')
+            comps.append(ind_fields)
         comps = xr.concat(comps,dim = subsets.index).unstack('concat_dim')
         comps.attrs.update({'nsamples':str(subsets.index.names) + str(subsets.map(lambda a: len(a)).to_dict()), 'units':da.units})
-        outname = f'{sl.start}_{sl.stop}_{COMPVAR}_anom{ANOM}{"_" + str(predagg) if AGGTIME else ""}{"_rollthresh" if ROLLTHRESH else ""}.nc'
+        outname = f'{sl.start}_{sl.stop}_{COMPVAR}_anom{ANOM}{"_" + str(predagg) if AGGTIME else ""}{"_rollthresh" if ROLLTHRESH else ""}{"_bootstrapped" if BOOTSTRAP else ""}.nc'
         print('writing: ', outname)
         comps.to_netcdf(outdir / outname, mode = 'w')
         da.close()
