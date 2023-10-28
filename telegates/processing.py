@@ -60,7 +60,7 @@ def fit_poly(array, degree: int = 3, year: int = None) -> xr.DataArray:
     returns array of coefficients.
     """
     if not (year is None):
-        array = array.sel(time = (warm.time.dt.year == year))
+        array = array.sel(time = (array.time.dt.year == year))
     X = array.coords['time'].dt.dayofyear
     y = array.stack({'latlon':['latitude','longitude']})
     coefs = np.polynomial.polynomial.polyfit(x = X, y = y, deg = degree)
@@ -74,7 +74,7 @@ def evaluate_poly(array : xr.DataArray, coefs: xr.DataArray, year: int = None):
     So custom computation.
     """
     if not (year is None):
-        array = array.sel(time = (warm.time.dt.year == year))
+        array = array.sel(time = (array.time.dt.year == year))
     X = array.coords['time'].dt.dayofyear
     y = xr.DataArray(np.zeros(array.shape), coords = array.coords, dims = array.dims)
     for degree in range(len(coefs)): # possibly later: https://en.wikipedia.org/wiki/Horner%27s_method
